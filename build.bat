@@ -1,0 +1,1 @@
+nvcc -O3 -Xcompiler "-Wall" -arch=compute_61 -code=sm_61 -g -G cudaTranspose.cu -o cudaTranspose
