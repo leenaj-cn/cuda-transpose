@@ -57,8 +57,52 @@ __global__ void faster_kernel(const Matrix d_A, Matrix d_B)
     unsigned int col1 = bx * blockDim.x + ty;
     unsigned int row1 = by * blockDim.y + tx;
 
-
+    //__shared__ DATA_TYPE s_d[TILE_WIDTH][TILE_WIDTH+1]; //performance not be better while avoiding bank conflict
     __shared__ DATA_TYPE s_d[TILE_WIDTH][TILE_WIDTH];
+
+    if(col < d_A.width && row < d_A.height)
+    {
+        s_d[ty][tx] = __ldg(&d_A.data[row * d_A.width + col]);
+        __syncthreads();
+    }
+
+    if(row1 < d_B.width && col1 < d_B.height)
+        d_B.data[col1 * d_B.width + row1] = s_d[tx][ty];
+
+}
+
+__global__ void kernel_diagonal(const Matrix d_A, Matrix d_B)
+{
+
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+
+    //__shared__ DATA_TYPE s_d[TILE_WIDTH][TILE_WIDTH+1]; //performance not be better while avoiding bank conflict
+    __shared__ DATA_TYPE s_d[TILE_WIDTH][TILE_WIDTH];
+
+    int blockIdx_x, blockIdx_y;
+
+    //if(d_A.width == d_A.height)
+    //{
+        blockIdx_y = bx;
+        blockIdx_x = (bx + by) % gridDim.x;
+
+
+    //}else{
+     //   int bid = bx + gridDim.x * by;
+     //   blockIdx_y = bid % gridDim.y;
+     //   blockIdx_x = ((bid / gridDim.y) + blockIdx_y) % gridDim.x;
+    //}
+
+    unsigned int col = blockIdx_x * blockDim.x + tx;
+    unsigned int row = blockIdx_y * blockDim.y + ty;
+    //unsigned int Index_In = row * d_A.width + col;
+
+    unsigned int col1 = bx * blockDim.x + ty;
+    unsigned int row1 = by * blockDim.y + tx;
+    //unsigned int Index_out = col1 * d_B.width + row1
 
     if(col < d_A.width && row < d_A.height)
     {
@@ -156,6 +200,7 @@ int main(int argc, char *argv[])
     dim3 grid3((d_A.width + block3.x - 1) / block3.x, (d_A.height + block3.y - 1) / block3.y);
     faster_kernel<<<grid3, block3>>>(d_A, d_B);
 
+    //kernel_diagonal<<<grid3, block3>>>(d_A, d_B);
 
     CheckError(cudaGetLastError());
     CheckError(cudaDeviceSynchronize());
@@ -175,7 +220,7 @@ int main(int argc, char *argv[])
     double eps = 1.e-6;
 
     //for(int i = 0; i < h_B.height * h_B.width; i++)
-    for(int i = 0; i < 2 * h_B.width; i++)
+    for(int i = 0; i < h_B.height * h_B.width; i++)
     {
             DATA_TYPE rel = h_B.data[i];
             DATA_TYPE ref = reference.data[i];
